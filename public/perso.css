@@ -1,0 +1,6 @@
+#logo {
+    background-image: url("./images/logosof.png");
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
