@@ -7,8 +7,8 @@
             <table class="table table-striped table-bordered">
                 <thead class="table-dark text-white"><tr><th>Matricule</th><th>Kilomètres parcourus</th></tr></thead>
                 <tbody>
-                    <tr v-for="item in chartData.datasets[0].data" :key="item">
-                        <td>{{ chartData.labels[chartData.datasets[0].data.indexOf(item)] }}</td>
+                    <tr v-for="(item, index) in chartData.datasets[0].data" :key="chartData.labels[index]">
+                        <td>{{ chartData.labels[index] }}</td>
                         <td>{{ item }}</td>
                     </tr>
                 </tbody>
@@ -68,7 +68,7 @@ export default defineComponent({
                     },
                     title: {
                         display: true,
-                        text: 'Chart.js Bar Chart',
+                        text: 'Kilomètres parcourus par car',
                     },
                 },
             },
@@ -78,9 +78,8 @@ export default defineComponent({
     methods: {
         async fetchData() {
             try {
-                const response = await axios.get('/moov');
+                const response = await axios.get('/movements/monthly');
                 const data = response.data.data;
-                console.log(data);
 
                 this.chartData = {
                     labels: data.map(item => item.matricule),

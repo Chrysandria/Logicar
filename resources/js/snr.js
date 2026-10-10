@@ -1,36 +1,35 @@
-import { SNR } from "./app";
+import "./app";
+import "bootstrap";
+import { createApp } from "vue";
+import { createPinia } from "pinia";
 import { createRouter, createWebHistory } from "vue-router";
-import traitement from "./component/SNR/traitement.vue";
-import today from "./component/SNR/today.vue";
-import car from "./component/SNR/car.vue";
-import user from "./component/SNR/user.vue";
-import reinitPassword from "./component/reinitPassword.vue";
+import snr from "./component/snr.vue";
 
 
 const routes = [
     {
         name: "today",
-        component: today,
+        component: () => import("./component/SNR/today.vue"),
         path: "/"
     },
     {
         name: "car",
-        component: car,
+        component: () => import("./component/SNR/car.vue"),
         path: "/car"
     },
     {
         name: "traitement",
-        component: traitement,
+        component: () => import("./component/SNR/traitement.vue"),
         path: "/traitement/:date?"
     },
     {
         name: "users",
-        component: user,
+        component: () => import("./component/SNR/user.vue"),
         path: "/users"
     },
     {
         name: "reinitPassword",
-        component: reinitPassword,
+        component: () => import("./component/reinitPassword.vue"),
         path: "/reinit"
     }
 ];
@@ -39,4 +38,4 @@ export const router = createRouter({
     history: createWebHistory("/snr/"),
     routes
 });
-SNR.use(router).mount("#app");
+createApp(snr).use(createPinia()).use(router).mount("#app");

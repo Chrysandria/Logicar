@@ -2,46 +2,65 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Anomalie;
+use App\Models\Car;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AnomalieController extends Controller
 {
-
-    public function index()
+    public function index(Request $request)
     {
-        $anomalies = DB::table("anomalies")->orderBy("id","desc")->get();
-        return response()->json($anomalies);
+        $query = Anomalie::query()->orderByDesc('id');
+
+        if ($request->filled('matricule')) {
+            $query->where('mtrl_car', $request->query('matricule'));
+        }
+
+        return response()->json($query->get());
     }
 
-    public function show(Request $request){
-        $validated = $request->validate([
-            'matricule' => 'required|string',
-        ]);
-
-        if($validated){
-            $results = DB::table("anomalies")->where("mtrl_car","=",$request->matricule)->get();
-            return response()->json($results);
-        }
-    }
-    public function update(Request $request)
+    public function store(Request $request, string $matricule)
     {
-        $validated = $request->validate([
-            'matricule' => 'required|string',
-            'id_anom' => 'required|integer',
+        $data = $request->validate([
+            'description' => 'required|in:technique,mecanique',
         ]);
 
-        if ($validated) {
-            DB::table('cars')
-                ->where('matricule', $request->matricule)
-                ->update(['disponibilite' => true]);
+        $car = Car::where('matricule', $matricule)->firstOrFail();
 
-            DB::table('anomalies')
-                ->where('id', $request->id_anom)
-                ->update(['fin' => DB::raw('CURRENT_DATE')]);
-
-            return response()->json(["message" => "fin de l'anomalie !!"], 200);
+        if (Anomalie::where('mtrl_car', $car->matricule)->whereNull('fin')->exists()) {
+            return response()->json(['message' => 'Une anomalie est déjà en cours pour ce car.'], 409);
         }
+
+        $anomalie = DB::transaction(function () use ($car, $data) {
+            $car->update(['disponibilite' => false]);
+
+            return Anomalie::create([
+                'mtrl_car' => $car->matricule,
+                'description' => $data['description'],
+                'debut' => today()->toDateString(),
+            ]);
+        });
+
+        return response()->json($anomalie, 201);
+    }
+
+    public function update(Anomalie $anomalie)
+    {
+        abort_if($anomalie->fin !== null, 409, 'Cette anomalie est déjà clôturée.');
+
+        DB::transaction(function () use ($anomalie) {
+            $anomalie->update(['fin' => today()->toDateString()]);
+
+            $hasOpenAnomaly = Anomalie::where('mtrl_car', $anomalie->mtrl_car)
+                ->whereNull('fin')
+                ->exists();
+
+            if (! $hasOpenAnomaly) {
+                Car::where('matricule', $anomalie->mtrl_car)->update(['disponibilite' => true]);
+            }
+        });
+
+        return response()->json($anomalie->fresh());
     }
 }

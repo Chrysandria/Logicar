@@ -11,8 +11,13 @@
         </div>
         <div class="table-responsive">
             <div class="mb-4">
-                <input type="search" name="" id="" class="form-control" placeholder="Nom d'utilisateur ou service"
-                    @input="search">
+                <input
+                    type="search"
+                    class="form-control"
+                    placeholder="Rechercher par nom d'utilisateur ou service"
+                    aria-label="Rechercher un utilisateur par nom ou service"
+                    v-model="searchTerm"
+                >
             </div>
             <table class="table table-striped table-bordered text-center align-middle">
                 <thead class="table-dark">
@@ -24,12 +29,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="user in users">
+                    <tr v-for="user in filteredUsers" :key="user.id">
                         <td> {{ user.id }} </td>
                         <td> {{ user.name }} </td>
                         <td> {{ user.service_sigle }} </td>
                         <td> <button class="btn btn-danger" @click="deleteUser(user.id)"><i class="bi bi-trash"></i>
                                 Supprimer</button> </td>
+                    </tr>
+                    <tr v-if="filteredUsers.length === 0">
+                        <td colspan="4" class="py-4 text-muted">Aucun utilisateur ne correspond à la recherche.</td>
                     </tr>
                 </tbody>
             </table>
@@ -75,10 +83,14 @@
 </template>
 
 <script>
+import { showRequestError } from "../../utils/interface.js";
+import { debugLog } from "../../utils/logger.js";
+
 export default {
     data() {
         return {
             users: [],
+            searchTerm: "",
             services: [],
             service: "",
             name: "",
@@ -86,28 +98,46 @@ export default {
         }
     },
 
+    computed: {
+        filteredUsers() {
+            const query = this.searchTerm.trim().toLocaleLowerCase("fr-FR");
+
+            if (!query) {
+                return this.users;
+            }
+
+            return this.users.filter((user) =>
+                [user.name, user.service_sigle]
+                    .some((value) => value.toLocaleLowerCase("fr-FR").includes(query)),
+            );
+        },
+    },
+
     methods: {
         async fetchUser() {
             try {
-                let response = await axios.get("/allUsers");
+                let response = await axios.get("/users");
                 this.users = response.data;
-
-                console.log(this.users);
-
-            } catch (err) {
-                console.error(err);
+                debugLog("users", "Utilisateurs chargés.", { count: this.users.length });
+            } catch (error) {
+                debugLog("users", "Échec du chargement des utilisateurs.", {
+                    status: error.response?.status ?? "network",
+                });
+                showRequestError(error, "Impossible de charger les utilisateurs.");
             }
         },
 
         async fetchServices() {
             try {
-                let response = await axios.get("/getServices");
+                let response = await axios.get("/services");
                 this.services = response.data;
-                console.log(this.services);
+                debugLog("users", "Services chargés.", { count: this.services.length });
 
-            } catch (err) {
-                console.error(err);
-
+            } catch (error) {
+                debugLog("users", "Échec du chargement des services.", {
+                    status: error.response?.status ?? "network",
+                });
+                showRequestError(error, "Impossible de charger les services.");
             }
         },
 
@@ -119,71 +149,57 @@ export default {
             }
 
             try {
-                let response = await axios.post("/register", {
+                let response = await axios.post("/users", {
                     name: this.name,
-                    service: this.service
+                    service_sigle: this.service
                 });
+                debugLog("users", "Utilisateur créé.", { service: this.service });
 
                 Swal.fire({
-                    Title: "Effectuer",
+                    title: "Effectuer",
                     icon: "success",
                     text: response.data.message
                 });
 
-                this.name = "",
-                this.service = ""
-                this.fetchUser();
+                this.name = "";
+                this.service = "";
+                await this.fetchUser();
             } catch (err) {
-                console.error(err);
-                Swal.fire({
-                    Title: "Erreur",
-                    icon: "error",
-                    text: "Une erreur s'est produite, veuillez reessayer."
-                })
+                showRequestError(err, "Une erreur s'est produite, veuillez réessayer.");
             }
         },
 
         async deleteUser(id) {
             try {
-                Swal.fire({
+                const confirmation = await Swal.fire({
                     title: 'Êtes-vous sûr ?',
                     text: `Voulez-vous rellemment supprimer cet utilisateur ?`,
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Oui, supprimer',
                     cancelButtonText: 'Annuler'
-                }).then(async (result) => {
-                    if (result.isConfirmed) {
-
-                        let response = await axios.delete("/deleteUser", {
-                            params: {
-                                id: id
-                            }
-                        });
-
-                        Swal.fire({
-                            title: "Effectuer",
-                            icon: "success",
-                            text: response.data.message
-                        });
-
-                        this.fetchUser();
-                    }
                 });
+
+                if (!confirmation.isConfirmed) return;
+
+                await axios.delete(`/users/${id}`);
+                debugLog("users", "Utilisateur supprimé.", { userId: id });
+
+                await Swal.fire({
+                    title: "Effectuer",
+                    icon: "success",
+                    text: "Utilisateur supprimé.",
+                });
+
+                await this.fetchUser();
             } catch (err) {
-                console.error(err);
-                Swal.fire({
-                    Title: "Erreur",
-                    icon: "error",
-                    text: "Une erreur s'est produite, veuillez reessayer."
-                })
+                showRequestError(err, "Une erreur s'est produite, veuillez réessayer.");
             }
         }
     },
 
     async mounted() {
-        await this.fetchServices();
-        await this.fetchUser();
+        await Promise.all([this.fetchServices(), this.fetchUser()]);
     }
 }
 </script>

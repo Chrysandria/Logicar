@@ -1,23 +1,24 @@
-import { OS } from "./app";
+import "./app";
+import "bootstrap";
+import { createApp } from "vue";
+import { createPinia } from "pinia";
 import { createRouter, createWebHistory } from "vue-router";
-import saisie from "./component/OS/saisie.vue";
-import today from "./component/OS/today.vue";
-import reinitPassword from "./component/reinitPassword.vue";
+import other_service from "./component/other_service.vue";
 
 const routes = [
     {
         name: "today",
-        component: today,
+        component: () => import("./component/OS/today.vue"),
         path: "/",
     },
     {
         name: "saisie",
-        component: saisie,
+        component: () => import("./component/OS/saisie.vue"),
         path: "/saisie/:date?/:service?",
     },
     {
         name: "reinitPassword",
-        component: reinitPassword,
+        component: () => import("./component/reinitPassword.vue"),
         path: "/reinit",
     },
 ];
@@ -26,4 +27,4 @@ export const router = createRouter({
     history: createWebHistory("/other_service/"),
     routes,
 });
-OS.use(router).mount("#app");
+createApp(other_service).use(createPinia()).use(router).mount("#app");

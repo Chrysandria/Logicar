@@ -1,20 +1,27 @@
 <template>
-    <div class="container-fluid p-3">
-        <div class="row mb-4 bg-white">
-            <div class="col">
-                <h6>Planning du : {{ date }}</h6>
+    <div class="container-fluid">
+        <header class="planning-toolbar mb-4">
+            <div class="planning-toolbar__content">
+                <span class="planning-toolbar__icon" aria-hidden="true">
+                    <i class="bi bi-calendar3"></i>
+                </span>
+                <div>
+                    <p class="planning-toolbar__label">Planning du</p>
+                    <h1 class="planning-toolbar__date">{{ date }}</h1>
+                </div>
             </div>
 
-            <div class="col d-flex align-items-end justify-content-end">
+            <div class="planning-toolbar__actions">
                 <button
                     class="btn btn-success"
                     data-bs-toggle="modal"
                     data-bs-target="#newPlanning"
                 >
+                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
                     Nouveau
                 </button>
             </div>
-        </div>
+        </header>
 
         <div
             v-if="plannings.length == 0"
@@ -106,6 +113,15 @@
                         </div>
                     </div>
 
+                    <div
+                        v-if="error_message"
+                        class="alert alert-danger planning-entry-error d-flex align-items-start gap-2"
+                        role="alert"
+                    >
+                        <i class="bi bi-exclamation-circle-fill mt-1" aria-hidden="true"></i>
+                        <span>{{ error_message }}</span>
+                    </div>
+
                     <div class="table-responsive">
                         <table
                             class="table table-stripped table-bordered w-auto text-center"
@@ -155,9 +171,6 @@
                                 </tr>
                             </tbody>
                         </table>
-                        <h2 class="text-center text-danger fw-semibold">
-                            {{ error_message }}
-                        </h2>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -182,8 +195,16 @@
 </template>
 
 <script>
-import * as bootstrap from "bootstrap";
 import { nextTick } from "vue";
+import {
+    closeLoading,
+    fetchPlannings,
+    formatFrenchDate,
+    initTooltips,
+    showLoading,
+    showRequestError,
+} from "../../utils/interface.js";
+import { debugLog } from "../../utils/logger.js";
 
 export default {
     data() {
@@ -209,47 +230,26 @@ export default {
 
     methods: {
         dateFormatation() {
-            let initialDate = new Date(this.$route.params.date);
-            const options = {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-            };
-            let Formateddate = new Intl.DateTimeFormat("fr-FR", options).format(
-                initialDate,
-            );
-
-            this.date = Formateddate;
-        },
-
-        initTooltips() {
-            document
-                .querySelectorAll("[data-bs-toggle='tooltip']")
-                .forEach((el) => {
-                    const instance = bootstrap.Tooltip.getInstance(el);
-                    if (instance) instance.dispose();
-                });
-
-            document
-                .querySelectorAll("[data-bs-toggle='tooltip']")
-                .forEach((el) => {
-                    new bootstrap.Tooltip(el, {
-                        placement: "right",
-                    });
-                });
+            this.date = formatFrenchDate(this.$route.params.date);
         },
 
         async getEmps() {
             try {
                 let service = this.$route.params.service;
-                let response = await axios.get("/emps", {
+                let response = await axios.get("/employees", {
                     params: {
                         service: service,
                     },
                 });
                 this.emps_in_db = response.data;
-                console.log(this.emps_in_db);
+                debugLog("planning-entry", "Employés chargés.", {
+                    count: this.emps_in_db.length,
+                    service,
+                });
             } catch (err) {
+                debugLog("planning-entry", "Échec du chargement des employés.", {
+                    status: err.response?.status ?? "network",
+                });
                 console.error(err);
             }
         },
@@ -280,18 +280,23 @@ export default {
                 return;
             }
             const enteredMatricule = this.list_emps[index].matricule;
-            console.log(enteredMatricule);
 
             const emp = this.emps_in_db.find(
                 (e) => e.matricule === enteredMatricule,
             );
             if (emp) {
+                debugLog("planning-entry", "Matricule reconnu.", {
+                    row: index + 1,
+                });
                 this.list_emps[index].nom = emp.nom;
                 this.list_emps[index].lieu_ramassage = emp.lieu_ramassage;
                 this.list_emps[index].telephone = emp.telephone;
                 this.list_emps[index].pnt_ramassage_dec = emp.pnt_ramassage_dec;
                 this.list_emps[index].pnt_ramassage_adm = emp.pnt_ramassage_adm;
             } else {
+                debugLog("planning-entry", "Matricule non reconnu.", {
+                    row: index + 1,
+                });
                 this.error_message = `Matricule ${enteredMatricule} non trouvé. Veuillez vérifier.`;
                 return;
             }
@@ -311,6 +316,9 @@ export default {
                     }
                 }
                 if (count > 1) {
+                    debugLog("planning-entry", "Matricule en doublon.", {
+                        row: i + 1,
+                    });
                     this.error_message = `Matricule ${this.list_emps[i].matricule} dupliqué. Veuillez vérifier.`;
                     return false;
                 }
@@ -321,22 +329,25 @@ export default {
 
         async getPlannings() {
             try {
-                let response = await axios.get("/get-plannings", {
-                    params: {
-                        date: this.$route.params.date,
-                        service: this.$route.params.service,
-                    },
+                this.plannings = await fetchPlannings(
+                    this.$route.params.date,
+                    this.$route.params.service,
+                );
+                debugLog("planning-entry", "Plannings chargés.", {
+                    count: this.plannings.length,
+                    date: this.$route.params.date,
                 });
-
-                console.log(response.data);
-                this.plannings = response.data;
             } catch (err) {
+                debugLog("planning-entry", "Échec du chargement des plannings.", {
+                    status: err.response?.status ?? "network",
+                });
                 console.error(err);
             }
         },
 
         async savePlanning() {
             if (this.hps === "") {
+                debugLog("planning-entry", "Enregistrement refusé : HPS vide.");
                 this.error_message = "Veuillez remplir le champ HPS.";
                 return;
             }
@@ -346,6 +357,7 @@ export default {
                 (this.list_emps.length === 1 &&
                     this.list_emps[0].matricule === "")
             ) {
+                debugLog("planning-entry", "Enregistrement refusé : aucun employé.");
                 this.error_message = "Veuillez saisir au moins un employé.";
                 return;
             }
@@ -354,27 +366,31 @@ export default {
                 (emp) => emp.matricule !== "" && emp.nom !== "",
             );
 
-            Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Traitement en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                },
+            showLoading("Traitement en cours");
+            debugLog("planning-entry", "Enregistrement du planning demandé.", {
+                date: this.$route.params.date,
+                employeeCount: this.list_emps.length,
+                hps: this.hps,
             });
 
             try {
                 let response = await axios.post(
-                    "/save_planning",
+                    "/plannings",
                     {
-                        list_emps: this.list_emps,
+                        employees: this.list_emps.map((employee) => ({
+                            matricule: employee.matricule,
+                        })),
                         hps: this.hps,
                         date: this.$route.params.date,
                     }
                 );
+                debugLog("planning-entry", "Planning enregistré.", {
+                    date: this.$route.params.date,
+                    employeeCount: this.list_emps.length,
+                    hps: this.hps,
+                });
 
-                Swal.close();
+                closeLoading();
 
                 Swal.fire({
                     icon: "success",
@@ -385,43 +401,40 @@ export default {
                 this.dateTime = "";
                 this.type = "";
                 this.list_emps = [
-                    { matricule: "", nom: "", lieu_ramassage: "", phone: "" },
+                    {
+                        matricule: "",
+                        nom: "",
+                        telephone: "",
+                        lieu_ramassage: "",
+                        pnt_ramassage_dec: "",
+                        pnt_ramassage_adm: "",
+                    },
                 ];
                 ((this.error_message = ""),
                     (this.hps = ""),
                     this.getPlannings());
             } catch (err) {
-                Swal.close();
-                Swal.fire({
-                    icon: "error",
-                    title: "Erreur",
-                    text:
-                        err.response.data.message ||
-                        "Une erreur est survenue lors de l'enregistrement du planning.",
+                debugLog("planning-entry", "Échec de l'enregistrement du planning.", {
+                    status: err.response?.status ?? "network",
                 });
-                console.error(err.response);
-
-            } finally {
-                console.log("Save planning attempt finished.");
+                closeLoading();
+                showRequestError(
+                    err,
+                    "Une erreur est survenue lors de l'enregistrement du planning.",
+                );
             }
         },
     },
 
     async mounted() {
-        Swal.fire({
-            title: "Veuilez patienter...",
-            text: "Chargement en cours",
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            didOpen: () => {
-                Swal.showLoading();
-            },
-        });
-        await this.getEmps();
-        await this.getPlannings();
-        Swal.close();
+        showLoading();
+        try {
+            await Promise.all([this.getEmps(), this.getPlannings()]);
+        } finally {
+            closeLoading();
+        }
         this.dateFormatation();
-        this.initTooltips();
+        await initTooltips();
     },
 
     watch: {
@@ -433,7 +446,7 @@ export default {
             deep: true,
             async handler() {
                 await nextTick();
-                this.initTooltips();
+                await initTooltips();
             },
         },
     },

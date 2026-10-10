@@ -1,16 +1,23 @@
 <template>
     <div class="container-fluid">
-        <div class="row mb-4 bg-white">
-            <div class="w-100 d-flex justify-content-between">
+        <header class="planning-toolbar mb-4">
+            <div class="planning-toolbar__content">
+                <span class="planning-toolbar__icon" aria-hidden="true">
+                    <i class="bi bi-calendar3"></i>
+                </span>
                 <div>
-                    <h4>Planning du : {{ date }}</h4>
-                </div>
-                <div class="d-flex justify-content-end">
-                    <button class="btn btn-primary rounded-5" type="button" data-bs-toggle="modal"
-                        data-bs-target="#search"><i class="bi bi-search"></i> Rechercher</button>
+                    <p class="planning-toolbar__label">Planning du</p>
+                    <h1 class="planning-toolbar__date">{{ date }}</h1>
                 </div>
             </div>
-        </div>
+
+            <div class="planning-toolbar__actions">
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#search">
+                    <i class="bi bi-search me-1" aria-hidden="true"></i>
+                    Rechercher
+                </button>
+            </div>
+        </header>
 
         <div v-if="plannings.length == 0"
             class="w-100 flex-fill d-flex gap-4 flex-column align-items-center justify-content-center mt-5 pt-5"
@@ -73,8 +80,9 @@
                             </div>
                         </div>
                     </div>
-                    <div v-if="results.length == 0" v-html="message">
-
+                    <div v-if="results.length === 0 && message" class="text-center fw-semibold mt-5">
+                        <h1>🔍</h1>
+                        <p>{{ message }}</p>
                     </div>
 
                     <div v-else>
@@ -120,9 +128,21 @@
 </template>
 
 <script>
-import Swal from 'sweetalert2';
+import {
+    closeLoading,
+    fetchPlannings,
+    formatFrenchDate,
+    getLocalIsoDate,
+    showLoading,
+    showRequestError,
+} from "../../utils/interface.js";
+import { useSessionStore } from "../../stores/session.js";
 
 export default {
+    setup() {
+        return { session: useSessionStore() };
+    },
+
     data() {
         return {
             date: "",
@@ -135,75 +155,40 @@ export default {
 
     methods: {
         dateFormatation() {
-            let initialDate = new Date();
-            const options = { year: 'numeric', month: 'numeric', day: 'numeric' };
-            let Formateddate = new Intl.DateTimeFormat("fr-FR", options).format(initialDate);
-
-            this.date = Formateddate;
+            this.date = formatFrenchDate(new Date());
         },
 
         async getPlannings() {
             try {
-                let service = localStorage.getItem("service");
-                console.log(service);
+                this.plannings = await fetchPlannings(
+                    getLocalIsoDate(),
+                    this.session.service,
+                );
 
-                let today = new Date().toLocaleDateString("en-CA");
-                console.log(today);
-
-
-                let response = await axios.get("/get-plannings", {
-                    params: {
-                        date: today,
-                        service: service
-                    }
-                });
-
-                console.log(response.data);
-                this.plannings = response.data
-
-            } catch (err) {
-                console.error(err);
-
+            } catch (error) {
+                await showRequestError(error, "Impossible de charger les plannings.");
             }
         },
 
         async filterPlannings() {
-            Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Recherche en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading("Recherche en cours");
             try {
-                let service = localStorage.getItem("service");
-                console.log(service);
+                const plannings = await fetchPlannings(
+                    this.filter,
+                    this.session.service,
+                );
 
-                let response = await axios.get("/get-plannings", {
-                    params: {
-                        date: this.filter,
-                        service: service
-                    }
-                });
-
-                console.log(response.data);
-                if (response.data.length === 0) {
+                if (plannings.length === 0) {
                     this.results = [];
-                    this.message = `<div class="w-100 flex-fill d-flex gap-4 flex-column align-items-center justify-content-center mt-5 pt-5" style="opacity: 0.8;">
-                        <h1 class="text-center">🔍</h1>
-                        <p class="text-center fw-semibold">Aucun résultat trouvé pour cette date !!</p>
-                      </div>`
+                    this.message = "Aucun résultat trouvé pour cette date.";
                 } else {
-                    this.results = response.data
+                    this.results = plannings;
+                    this.message = "";
                 }
-                Swal.close()
-
-            } catch (err) {
-                console.error(err);
-                Swal.close();
-
+            } catch {
+                this.message = "La recherche a échoué. Veuillez réessayer.";
+            } finally {
+                closeLoading();
             }
         },
 
@@ -215,18 +200,13 @@ export default {
     },
 
     async mounted() {
-        Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Chargement en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-        await this.getPlannings();
-        Swal.close();
-        this.dateFormatation()
+        showLoading();
+        try {
+            await this.getPlannings();
+        } finally {
+            closeLoading();
+        }
+        this.dateFormatation();
     },
 
 }

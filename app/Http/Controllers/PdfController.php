@@ -2,95 +2,149 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use TCPDF;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use RuntimeException;
+use TCPDF;
 
 class PdfController extends Controller
 {
     public function generate(Request $request)
     {
-        $validate = $request->validate([
+        $data = $request->validate([
             'date' => 'required|date',
             'hps' => 'required|date_format:H:i',
             'data' => 'required|array',
+            'data.*.ramassage' => 'required|array',
+            'data.*.ramassage.*.HDR' => 'required|string',
+            'data.*.ramassage.*.trajet' => 'required|string',
+            'data.*.emps' => 'required|array',
+            'data.*.emps.*.matricule' => 'required|string',
+            'data.*.emps.*.nom' => 'required|string',
+            'data.*.emps.*.telephone' => 'nullable|string',
+            'data.*.emps.*.lieu_ramassage' => 'nullable|string',
+            'data.*.emps.*.pnt_ramassage_adm' => 'nullable|string',
+            'data.*.emps.*.pnt_ramassage_dec' => 'nullable|string',
         ]);
 
-        if ($validate) {
-            $date = Carbon::parse($request->date)->format('d-m-Y');
-            $hps = Carbon::createFromFormat('H:i', $request->hps)->format('H:i');
+        $date = Carbon::parse($data['date'])->format('d/m/Y');
+        $hps = Carbon::createFromFormat('H:i', $data['hps'])->format('H:i');
+        $logoPath = public_path('images/logosof.png');
 
-            $data = $request->data;
+        if (! is_file($logoPath)) {
+            throw new RuntimeException('Le logo requis pour générer le PDF est introuvable.');
+        }
 
-            $pdf = new TCPDF();
-            $pdf->setCreator('Laravel TCPDF');
-            $pdf->setAuthor('Logicar');
-            $pdf->setTitle($date . ' - ' . $hps);
+        $pdf = new TCPDF('L', 'mm', 'A4', true, 'UTF-8', false);
+        $pdf->SetCreator('LogiCar');
+        $pdf->SetAuthor('SOFITRANS S.A');
+        $pdf->SetTitle("Planning du {$date} - {$hps}");
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+        $pdf->SetMargins(12, 12, 12);
+        $pdf->SetAutoPageBreak(true, 16);
+        $pdf->AddPage();
 
-            $pdf->setPrintHeader(false);
-            $pdf->setPrintFooter(false);
+        $pdf->Image($logoPath, 12, 12, 52, 0, 'PNG');
+        $pdf->SetXY(76, 13);
+        $pdf->SetFont('helvetica', 'B', 19);
+        $pdf->SetTextColor(16, 24, 40);
+        $pdf->Cell(0, 10, 'Planning des ramassages', 0, 1, 'L');
+        $pdf->SetX(76);
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->SetTextColor(71, 84, 103);
+        $pdf->Cell(90, 7, 'Date : '.$date, 0, 0, 'L');
+        $pdf->Cell(90, 7, 'Prise de service : '.$hps, 0, 1, 'L');
 
-            $pdf->AddPage();
+        $pdf->SetY(36);
+        $pdf->SetDrawColor(21, 94, 239);
+        $pdf->SetLineWidth(0.8);
+        $pdf->Line(12, 36, 285, 36);
+        $pdf->Ln(7);
 
-            $pdf->setFont('helvetica', 'B', 16);
-            $pdf->Cell(0, 15, 'SOFITRANS S.A', 0, 0, 'L');
-            $pdf->SetFont('helvetica', '', 12);
-            $pdf->Cell(0, 10, "Planning du : " . $date, 0, 1, 'R');
-            $pdf->Cell(0, 10, 'HPS : ' . $hps, 0, 1, 'R');
-            $divider = "<hr style='border:1px solid #000;' />";
-            $pdf->writeHTML($divider, true, false, true, false, '');
-
-
-            $pdf->Ln(10);
-            $pdf->SetFont('helvetica', '', 12);
-
-            foreach ($data as $item) {
-                $table = '<table border="1" cellpadding="4">
-                            <thead>
-                                <tr style="background-color:#303030; color:#fff;">
-                                    <th style="inline-size: 30px;"><strong>#</strong></th>
-                                    <th style="inline-size: 150px;"><strong>Nom</strong></th>
-                                    <th><strong>Telephone</strong></th>
-                                    <th><strong>Lieu de ramassage</strong></th>
-                                    <th><strong>Point de ramassage ADM</strong></th>
-                                    <th><strong>Point de ramassage décalé</strong></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        ';
-                foreach ($item["ramassage"] as $ramassage) {
-                    $pdf->setFont('helvetica', '', 10);
-                    $pdf->Ln(0);
-                    $pdf->Cell(0,10,"Trajet : ".$ramassage["trajet"],0,0,'L');
-                    $pdf->Cell(0,10,"HDR : ".Carbon::parse($ramassage["HDR"])->format('H:i'),0,1,'R');
-                    $pdf->Ln(2);
-                }
-
-                foreach($item["emps"] as $emp){
-                    $pdf->setFont('helvetica', '', 10);
-                    $pdf->Ln(0);
-                    $table .= '    <tr>
-                                        <td align="center" style="inline-size: 30px;">' . $emp['matricule'] . '</td>
-                                        <td align="center" style="inline-size: 150px;">' . $emp['nom'] . '</td>
-                                        <td align="center">' . $emp['telephone'] . '</td>
-                                        <td align="center">' . $emp['lieu_ramassage'] . '</td>
-                                        <td align="center">' . $emp['pnt_ramassage_adm'] . '</td>
-                                        <td align="center">' . $emp['pnt_ramassage_dec'] . '</td>
-                                    </tr>
-                              ';
-                }
-                $table .= '</tbody></table>';
-                $pdf->writeHTML($table, true, false, true, false, '');
-
-               $pdf->writeHTML('<hr style="border:1px solid #000;" />', true, false, true, false, '');
-               $pdf->Ln(5);
+        foreach ($data['data'] as $item) {
+            foreach ($item['ramassage'] as $ramassage) {
+                $pdf->SetFillColor(239, 244, 255);
+                $pdf->SetDrawColor(208, 221, 255);
+                $pdf->SetTextColor(21, 54, 111);
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->Cell(
+                    261,
+                    10,
+                    '  Trajet : '.self::escape($ramassage['trajet'])
+                        .'     |     Début du ramassage : '.self::escape(self::formatTime($ramassage['HDR'])),
+                    1,
+                    1,
+                    'L',
+                    true,
+                );
+                $pdf->Ln(2);
             }
 
-            return response($pdf->Output('planning_' . $date . '_' . $hps . '.pdf', 'S'), 200)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', "inline;filename=planning_$date._$hps.pdf");
-        } else {
-            return response()-> json(["message" => "Erreur de validation"]);
+            $table = '
+                <table border="1" cellpadding="5" cellspacing="0" width="100%">
+                    <thead>
+                        <tr style="background-color:#155eef;color:#ffffff;font-weight:bold;">
+                            <th width="8%" align="center">Matricule</th>
+                            <th width="20%">Nom et prénom</th>
+                            <th width="13%" align="center">Téléphone</th>
+                            <th width="17%">Lieu de ramassage</th>
+                            <th width="21%">Point ADM</th>
+                            <th width="21%">Point décalé</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+
+            foreach ($item['emps'] as $index => $employee) {
+                $background = $index % 2 === 0 ? '#ffffff' : '#f5f8ff';
+                $table .= '<tr style="background-color:'.$background.';">
+                    <td align="center">'.self::escape($employee['matricule']).'</td>
+                    <td>'.self::escape($employee['nom']).'</td>
+                    <td align="center">'.self::escape($employee['telephone'] ?? '').'</td>
+                    <td>'.self::escape($employee['lieu_ramassage'] ?? '').'</td>
+                    <td>'.self::escape($employee['pnt_ramassage_adm'] ?? '').'</td>
+                    <td>'.self::escape($employee['pnt_ramassage_dec'] ?? '').'</td>
+                </tr>';
+            }
+
+            $table .= '</tbody></table><br />';
+
+            $pdf->SetTextColor(16, 24, 40);
+            $pdf->SetFont('helvetica', '', 9);
+            $pdf->writeHTML($table, true, false, true, false, '');
+            $pdf->Ln(3);
+        }
+
+        $pageCount = $pdf->getNumPages();
+        for ($page = 1; $page <= $pageCount; $page++) {
+            $pdf->setPage($page);
+            $pdf->SetY(-12);
+            $pdf->SetDrawColor(228, 231, 236);
+            $pdf->Line(12, $pdf->GetY(), 285, $pdf->GetY());
+            $pdf->SetY(-10);
+            $pdf->SetFont('helvetica', '', 8);
+            $pdf->SetTextColor(102, 112, 133);
+            $pdf->Cell(0, 6, "SOFITRANS S.A  |  Planning du {$date}  |  Page {$page}/{$pageCount}", 0, 0, 'R');
+        }
+
+        $filename = 'planning_'.$data['date'].'_'.$hps.'.pdf';
+
+        return response($pdf->Output($filename, 'S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="'.$filename.'"');
+    }
+
+    private static function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private static function formatTime(string $value): string
+    {
+        try {
+            return Carbon::parse($value)->format('H:i');
+        } catch (\Carbon\Exceptions\InvalidFormatException) {
+            return $value;
         }
     }
 }

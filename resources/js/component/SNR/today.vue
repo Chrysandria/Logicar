@@ -1,12 +1,16 @@
 <template>
     <div class="container-fluid">
-        <div class="row mb-4 bg-white">
-            <div class="w-100 d-flex justify-content-between">
+        <header class="planning-toolbar mb-4">
+            <div class="planning-toolbar__content">
+                <span class="planning-toolbar__icon" aria-hidden="true">
+                    <i class="bi bi-calendar3"></i>
+                </span>
                 <div>
-                    <h4>Planning du : {{ date }}</h4>
+                    <p class="planning-toolbar__label">Planning du</p>
+                    <h1 class="planning-toolbar__date">{{ date }}</h1>
                 </div>
             </div>
-        </div>
+        </header>
 
         <div v-if="plannings.length == 0"
             class="w-100 flex-fill d-flex gap-4 flex-column align-items-center justify-content-center mt-5 pt-5"
@@ -55,6 +59,15 @@
 </template>
 
 <script>
+import {
+    closeLoading,
+    fetchPlannings,
+    formatFrenchDate,
+    getLocalIsoDate,
+    showLoading,
+    showRequestError,
+} from "../../utils/interface.js";
+
 export default {
     data() {
         return {
@@ -67,64 +80,41 @@ export default {
 
     methods: {
         dateFormatation() {
-            let initialDate = new Date();
-            const options = { year: 'numeric', month: 'numeric', day: 'numeric' };
-            let Formateddate = new Intl.DateTimeFormat("fr-FR", options).format(initialDate);
-
-            this.date = Formateddate;
+            this.date = formatFrenchDate(new Date());
         },
 
         async getPlannings() {
             try {
-                let today = new Date().toLocaleDateString("en-CA");
-                console.log(today);
+                this.plannings = await fetchPlannings(getLocalIsoDate());
 
-
-                let response = await axios.get("/gap", {
-                    params: {
-                        date: today,
-                    }
-                });
-
-                console.log(response.data);
-                this.plannings = response.data
-
-            } catch (err) {
-                console.error(err);
-
+            } catch (error) {
+                console.error("Impossible de charger les plannings.", error);
             }
         },
 
         async set_non_recups(id){
             try {
-                let response = await axios.put("/set_non_recups", {
-                        id: id
+                await axios.patch(`/plannings/${id}`, {
+                    ok: false
                 });
 
-                console.log(response.data);
                 await this.getPlannings();
 
-            } catch (err) {
-                console.error(err);
-
+            } catch (error) {
+                showRequestError(error, "Impossible de mettre à jour le planning.");
             }
         }
 
     },
 
     async mounted() {
-        Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Chargement en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-       await this.getPlannings();
-        Swal.close();
-        this.dateFormatation()
+        showLoading();
+        try {
+            await this.getPlannings();
+        } finally {
+            closeLoading();
+        }
+        this.dateFormatation();
     },
 
 }

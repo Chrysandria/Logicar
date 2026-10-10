@@ -1,16 +1,16 @@
 <template>
-    <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
+    <div class="auth-screen d-flex align-items-center justify-content-center min-vh-100">
         <div class="container-fluid">
             <div class="row d-flex align-items-center justify-content-center p-4">
                 <div class="col-12">
-                    <h2 class="w-100 text-center mb-4">Bienvenue sur Logicar 👋🏽</h2>
+                    <h2 class="auth-heading w-100 text-center mb-4">Bienvenue sur Logicar 👋🏽</h2>
                 </div>
-                <div class="col-12 col-md-9 col-lg-6 shadow-sm rounded-5 bg-white bg-gradient">
+                <div class="auth-card col-12 col-md-9 col-lg-10 shadow-sm rounded-5 bg-white bg-gradient">
                     <div class="row">
-                        <div class="col-12 col-lg-6 d-flex align-items-center justify-content-center">
+                        <div class="auth-brand col-12 col-lg-6 d-flex align-items-center justify-content-center">
                             <img src="../../../public/images/logosof.png" alt="" class="img-fluid">
                         </div>
-                        <div class="col-12 col-lg-6 d-flex align-items-center justify-content-center flex-column p-4">
+                        <div class="auth-form col-12 col-lg-6 d-flex align-items-center justify-content-center flex-column p-4">
                             <h3 class="text-decoration-underline">Connexion</h3>
                             <form class="w-100 p-4 d-flex flex-column" @submit.prevent="submitLogin">
                                 <div class="mb-4">
@@ -51,9 +51,14 @@
 </template>
 
 <script>
-import axios from 'axios';
+import { useSessionStore } from "../stores/session.js";
+import { showLoading } from "../utils/interface.js";
 
 export default {
+    setup() {
+        return { session: useSessionStore() };
+    },
+
     data() {
         return {
             name: "",
@@ -72,18 +77,13 @@ export default {
         },
 
         async submitLogin() {
-            Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Traitement en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading("Traitement en cours");
             try {
-                let response = await axios.post('/authentify', { name: this.name, password: this.password });
-                if (response.data.user.service_sigle == "SNR") {
+                const user = await this.session.login({
+                    name: this.name,
+                    password: this.password,
+                });
+                if (user.service_sigle === "SNR") {
                     window.location.href = "/snr"
                 } else {
                     window.location.href = "/other_service"
@@ -100,11 +100,9 @@ export default {
 
         async getConnectedUser() {
             try {
-                const response = await axios.get("/user");
-                const user = response.data;
-                console.log(user);
+                const user = await this.session.fetchSession();
 
-                if (user.user.service_sigle === "SNR") {
+                if (user.service_sigle === "SNR") {
                     window.location.href = "/snr"
                 } else {
                     window.location.href = "/other_service"

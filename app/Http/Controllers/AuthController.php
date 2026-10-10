@@ -4,88 +4,53 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
+    public function store(Request $request)
     {
         $credentials = $request->validate([
             'name' => 'required|string',
             'password' => 'required|string|min:4',
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
-            $request->session()->regenerate();
-            return response()->json(['message' => 'Login successful', 'user' => $user], 200);
-        } else {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        if (! Auth::attempt($credentials)) {
+            return response()->json(['message' => 'Identifiants incorrects.'], 401);
         }
+
+        $request->session()->regenerate();
+
+        return response()->json(['user' => $request->user()]);
     }
 
-    public function reset(Request $request)
+    public function show(Request $request)
     {
-        $credentials = $request->validate([
-            'name' => 'required|string',
-            'password' => 'required|string|min:4',
-            "newPassword" => 'required|string|min:4'
-        ]);
-
-        if(Auth::attempt(["name" => $credentials["name"], "password" => $credentials["password"]])) {
-            User::where("name","=",$request->name,"and")->update([
-                "password" => bcrypt($request->newPassword)
-            ]);
-
-            return response()->json(["message" => "Modification enregistrée."]);
-        }
+        return response()->json(['user' => $request->user()]);
     }
 
-    public function logout()
+    public function destroy(Request $request)
     {
         Auth::logout();
-        return response()->json(['message' => 'Logout successful'], 200);
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->noContent();
     }
 
-    public function register(Request $request)
+    public function updatePassword(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string',
-            'service' => 'required|string',
+            'current_password' => 'required|string|min:4',
+            'password' => 'required|string|min:4',
         ]);
 
-        $user = User::create([
-            'name' => $data['name'],
-            'password' => bcrypt("0000"),
-            'service_sigle' => $data['service'],
-        ]);
-
-        return response()->json(['message' => 'Nouvel utilisateur créé avec le mot de passe par defaut "0000" ', 'user' => $user], 201);
-    }
-
-    public function getUser()
-    {
-        if (Auth::check()) {
-            return response()->json(["user" => Auth::user(), "connected" => true]);
-        } else {
-            return response()->json(["user" => null, "connected" => false]);
+        if (! Hash::check($data['current_password'], $request->user()->password)) {
+            return response()->json(['message' => 'Le mot de passe actuel est incorrect.'], 422);
         }
-    }
 
-    public function delete(Request $request){
-        $validate = $request->validate([
-            "id" => "required|integer"
-        ]);
+        $request->user()->update(['password' => $data['password']]);
 
-        if($validate){
-            User::where("id","=",$request->id,"and")->delete();
-
-            return response()->json(["message" => "Cette utilisateur a été supprimé avec succés."]);
-        }
-    }
-
-    public function AllUsers()
-    {
-        return response()->json(User::all());
+        return response()->json(['message' => 'Mot de passe modifié avec succès.']);
     }
 }

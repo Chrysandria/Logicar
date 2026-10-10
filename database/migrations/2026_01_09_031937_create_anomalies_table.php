@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Carbon\Carbon;
 
 return new class extends Migration
 {
@@ -14,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('anomalies', function (Blueprint $table) {
             $table->id();
-            $table->string("mtrl_car");
-            $table->set("description",["technique","mecanique"]);
-            $table->date("debut")->default(today());
-            $table->date("fin")->nullable();
+            $table->string('mtrl_car');
+            $table->string('description');
+            $table->date('debut');
+            $table->date('fin')->nullable();
             $table->timestamps();
         });
     }

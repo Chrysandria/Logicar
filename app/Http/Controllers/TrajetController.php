@@ -4,69 +4,47 @@ namespace App\Http\Controllers;
 
 use App\Models\Trajet;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class TrajetController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        $trajet = Trajet::all();
-
-        return response()->json($trajet);
+        return response()->json(Trajet::query()->orderBy('designation')->get());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    public function show(Trajet $trip)
+    {
+        return response()->json($trip);
+    }
+
     public function store(Request $request)
     {
-        $validate = $request->validate([
-            "designation" => "required|string",
-            "trajet" => "required|array"
+        $data = $request->validate([
+            'designation' => 'required|string|max:255|unique:trajets,designation',
+            'trajet' => 'required|array',
         ]);
 
-        Trajet::create($validate);
-        return response()->json(["message" => `Trajet {$request->designation} créer avec succés !!`]);
+        Trajet::create($data);
+
+        return response()->json(['message' => "Trajet {$data['designation']} créé avec succès !!"], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request)
+    public function update(Request $request, Trajet $trip)
     {
-        $validate = $request->validate([
-            "id_trajet" => "required|integer",
-            "trajet" => "required|array"
+        $data = $request->validate([
+            'designation' => 'sometimes|required|string|max:255|unique:trajets,designation,'.$trip->id,
+            'trajet' => 'sometimes|required|array',
         ]);
 
-        if($validate){
-            $trajet = Trajet::find("id",$request->id_trajet);
-            $trajet->update([
-                "trajet" => $request->trajet
-            ]);
+        $trip->update($data);
 
-            return response()->json(["message" => "Mise à jour éffectué !!"]);
-        }
+        return response()->json($trip->fresh());
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Request $request)
+    public function destroy(Trajet $trip)
     {
-         $validate = $request->validate([
-            "id_trajet" => "required|integer",
-        ]);
+        $trip->delete();
 
-        if($validate){
-            DB::table("trajets")->delete($request->id_trajet);
-        }
+        return response()->noContent();
     }
 }

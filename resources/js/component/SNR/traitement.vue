@@ -1,10 +1,16 @@
 <template>
     <div class="container-fluid">
-        <div class="row mb-4 bg-white">
-            <div class="col">
-                <h4>Planning du : {{ date }}</h4>
+        <header class="planning-toolbar mb-4">
+            <div class="planning-toolbar__content">
+                <span class="planning-toolbar__icon" aria-hidden="true">
+                    <i class="bi bi-calendar3"></i>
+                </span>
+                <div>
+                    <p class="planning-toolbar__label">Planning du</p>
+                    <h1 class="planning-toolbar__date">{{ date }}</h1>
+                </div>
             </div>
-        </div>
+        </header>
 
         <div v-if="plannings.length == 0"
             class="w-100 flex-fill d-flex gap-4 flex-column align-items-center justify-content-center mt-5 pt-5"
@@ -71,8 +77,9 @@
                                 <input type="time" name="hps" id="hps" v-model="hdr" class="form-control">
                             </div>
                             <div class="d-flex justify-content-end">
-                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recap"
-                                    @click="able()">Recapitulation</button>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recap">
+                                    Recapitulation
+                                </button>
                             </div>
                         </div>
                         <div class="input-group w-25 mt-4">
@@ -191,6 +198,15 @@
 </template>
 
 <script>
+import {
+    closeLoading,
+    fetchPlannings,
+    formatFrenchDate,
+    showLoading,
+    showRequestError,
+} from "../../utils/interface.js";
+import { debugLog } from "../../utils/logger.js";
+
 export default {
     data() {
         return {
@@ -219,97 +235,98 @@ export default {
 
     methods: {
         dateFormatation() {
-            let initialDate = new Date(this.$route.params.date);
-            const options = { year: 'numeric', month: 'numeric', day: 'numeric' };
-            let Formateddate = new Intl.DateTimeFormat("fr-FR", options).format(initialDate);
-
-            this.date = Formateddate;
+            this.date = formatFrenchDate(this.$route.params.date);
         },
 
         async getPlannings() {
             try {
-                let response = await axios.get("/gap", {
-                    params: {
-                        date: this.$route.params.date,
-                    }
-                });
+                this.plannings = await fetchPlannings(this.$route.params.date);
 
-                console.log(response.data);
-                this.plannings = response.data
-
-            } catch (err) {
-                console.error(err);
-
+            } catch (error) {
+                await showRequestError(error, "Impossible de charger les plannings.");
             }
         },
 
         async setTriParams(h) {
             this.hps = h.substring(0, 5);
-            let response = await axios.get("/pwr", {
-                params: {
-                    date: this.$route.params.date,
-                    hps: this.hps
-                }
-            });
-            console.log(response.data);
-
-            this.PAT = response.data;
-
-            let response2 = await axios.get("/pr", {
-                params: {
-                    date: this.$route.params.date,
-                    hps: this.hps
-                }
-            });
-
-            this.details = response2.data;
-            //console.log(this.details);
-            console.log(this.details[0].ramassage);
-
-
-            console.log(response2.data);
-
-
-        },
-
-        async save() {
             try {
-                console.log(this.sub);
-                let ramassageResponse = await axios.post("/create_ramassage", {
-                    HDR: this.hdr,
-                    id_trajet: this.id_trajet,
-                    plannings: this.sub
+                const params = {
+                    date: this.$route.params.date,
+                    hps: this.hps
+                };
+                const [unassigned, ramassages] = await Promise.all([
+                    axios.get("/plannings/unassigned", { params }),
+                    axios.get("/plannings/ramassages", { params })
+                ]);
+
+                this.PAT = unassigned.data;
+                this.details = ramassages.data;
+                this.dsb = this.PAT.length > 0;
+                debugLog("planning-treatment", "Données de traitement chargées.", {
+                    availableCount: this.PAT.length,
+                    ramassageCount: this.details.length,
+                    date: params.date,
+                    hps: params.hps,
                 });
-
-                console.log(ramassageResponse.data);
-                this.setTriParams(this.hps);
-                this.sub = [];
-                this.id_trajet = "";
-                this.hdr = "";
-
-            } catch (err) {
-                console.error(err);
+            } catch (error) {
+                debugLog("planning-treatment", "Échec du chargement du traitement.", {
+                    status: error.response?.status ?? "network",
+                });
+                showRequestError(error, "Impossible de charger le traitement du planning.");
             }
         },
 
-        able() {
-            if (this.PAT.length === 0) this.dsb = false;
+        async save() {
+            if (!this.hdr || !this.id_trajet || this.sub.length === 0) {
+                Swal.fire({
+                    title: "Informations manquantes",
+                    text: "Indiquez l'heure, le trajet et sélectionnez au moins un employé.",
+                    icon: "warning"
+                });
+                return;
+            }
+
+            try {
+                await axios.post("/ramassages", {
+                    hdr: this.hdr,
+                    trip_id: this.id_trajet,
+                    planning_ids: this.sub.map((planning) => planning.p_id)
+                });
+                debugLog("planning-treatment", "Ramassage enregistré.", {
+                    employeeCount: this.sub.length,
+                    hps: this.hps,
+                });
+
+                this.sub = [];
+                this.id_trajet = "";
+                this.hdr = "";
+                await this.setTriParams(this.hps);
+            } catch (err) {
+                debugLog("planning-treatment", "Échec de l'enregistrement du ramassage.", {
+                    status: err.response?.status ?? "network",
+                });
+                showRequestError(err, "Le ramassage n'a pas pu être enregistré.");
+            }
         },
 
         async getAllTrajet() {
             try {
-                let response = await axios.get("/allTrajet");
+                let response = await axios.get("/trips");
                 this.trajets = response.data;
-
-                console.log(this.trajets);
+                debugLog("planning-treatment", "Trajets chargés.", {
+                    count: this.trajets.length,
+                });
             } catch (err) {
-                console.error(err);
+                debugLog("planning-treatment", "Échec du chargement des trajets.", {
+                    status: err.response?.status ?? "network",
+                });
+                showRequestError(err, "Impossible de charger les trajets.");
             }
         },
 
         async generatePdf() {
             try {
-                let response = await axios.post("/pdf", {
+                let response = await axios.post("/plannings/pdf", {
                     date: this.$route.params.date,
                     hps: this.hps,
                     data: this.details
@@ -320,27 +337,28 @@ export default {
                 const blob = new Blob([response.data], { type: 'application/pdf' });
                 const url = window.URL.createObjectURL(blob);
                 window.open(url);
+                debugLog("planning-treatment", "PDF de planning généré.", {
+                    date: this.$route.params.date,
+                    hps: this.hps,
+                    size: blob.size,
+                });
             } catch (err) {
-                console.error(err);
-                alert("Pdf non générer");
+                debugLog("planning-treatment", "Échec de la génération du PDF.", {
+                    status: err.response?.status ?? "network",
+                });
+                showRequestError(err, "Le PDF n'a pas pu être généré.");
             }
         }
 
     },
 
     async mounted() {
-        Swal.fire({
-                title: "Veuilez patienter...",
-                text: "Chargement en cours",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-        await this.getPlannings();
-        await this.getAllTrajet();
-        Swal.close();
+        showLoading();
+        try {
+            await Promise.all([this.getPlannings(), this.getAllTrajet()]);
+        } finally {
+            closeLoading();
+        }
         this.dateFormatation();
     },
 

@@ -2,36 +2,36 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Employe;
-use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EmployeController extends Controller
 {
-    public function index(Request $request){
-        try {
-            $validate = $request->validate([
-            "service" => "required|string"
+    public function index(Request $request)
+    {
+        $data = $request->validate([
+            'service' => 'sometimes|required|string',
         ]);
 
-        if($validate){
-            $emps = Employe::where("service_sigle","=",$request->service,null)->get();
-            return response()->json($emps, 200);
-        }
-        } catch(Exception $e){
-            return response()->json([
-                "error" => $e->getMessage()
-            ], 501);
-        }
+        $service = $data['service'] ?? $request->user()->service_sigle;
+        abort_unless($service === $request->user()->service_sigle, 403);
+
+        return response()->json(
+            Employe::where('service_sigle', $service)
+                ->orderBy('nom')
+                ->get()
+        );
     }
 
-    public function getServices(){
-        $services = DB::table("employes")
-        ->select("employes.service_sigle")
-        ->distinct()->get();
+    public function services()
+    {
+        $services = DB::table('employes')
+            ->select('employes.service_sigle')
+            ->distinct()
+            ->orderBy('employes.service_sigle')
+            ->get();
 
         return response()->json($services);
     }
-
 }

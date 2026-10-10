@@ -1,5 +1,5 @@
 <template>
-    <header class="sticky-top bg-white">
+    <header class="workspace-header sticky-top bg-white">
         <nav
             class="navbar navbar-expand-lg navbar-light bg-white pe-4 sticky-top"
         >
@@ -48,7 +48,7 @@
                         >
                     </div>
                     <div
-                        class="d-none d-lg-flex justify-content-end ms-auto gap-2"
+                        class="d-flex justify-content-end ms-auto gap-2"
                     >
                         <router-link to="/reinit"
                             ><button class="btn btn-secondary">
@@ -64,7 +64,7 @@
                             Déconnexion
                         </button>
                     </div>
-                    <div
+                    <!-- <div
                         class="d-flex d-lg-none justify-content-end ms-auto gap-2"
                     >
                         <router-link to="/reinit"
@@ -81,14 +81,12 @@
                         <button class="btn btn-danger" @click="logOut" title="Déconnexion">
                             <i class="bi bi-box-arrow-left"></i>
                         </button>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </nav>
 
-        <div
-            class="d-flex justify-content-between px-4 py-3 bg-light border-bottom mb-4 no-print"
-        >
+        <div class="workspace-topbar d-flex justify-content-between px-4 py-3 bg-light border-bottom no-print">
             <div>
                 <h5>Espace SNR admin</h5>
             </div>
@@ -108,60 +106,33 @@
 </template>
 
 <script>
-import Swal from "sweetalert2";
+import {
+    closeLoading,
+    getPlanningCalendar,
+    logout,
+    showAccessDenied,
+    showAuthenticationRequired,
+    showLoading,
+    startFrenchClock,
+} from "../utils/interface.js";
+import { useSessionStore } from "../stores/session.js";
 
 export default {
+    setup() {
+        return { session: useSessionStore() };
+    },
+
     data() {
         return {
-            Days: [],
+            Days: getPlanningCalendar(),
             dateTime: "",
+            clockInterval: null,
         };
     },
 
     methods: {
         logOut() {
-            Swal.fire({
-                title: "Déconnexion",
-                text: "Êtes-vous sûr de vouloir vous déconnecter ?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Confirmer",
-                cancelButtonText: "Annuler",
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    Swal.fire({
-                        title: "Veuilez patienter...",
-                        text: "Deconnection en cours",
-                        allowOutsideClick: false,
-                        allowEscapeKey: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        },
-                    });
-                    try {
-                        await axios.post("/logout");
-                        window.location.href = "/login";
-                    } catch (error) {
-                        console.error("Error during logout:", error);
-                        Swal.close();
-                        Swal.fire({
-                            title: "Erreur",
-                            text: "Une erreur est survenue lors de la déconnexion. Veuillez réessayer.",
-                            icon: "error",
-                        });
-                    }
-                }
-            });
-        },
-
-        async GetDays() {
-            try {
-                let response = await axios.get("/nweek");
-                this.Days = response.data;
-                console.log(this.Days);
-            } catch (err) {
-                console.error(err);
-            }
+            return logout(this.session);
         },
 
         CapitaliseFirst(string) {
@@ -170,61 +141,33 @@ export default {
 
         async getConnectedUser() {
             try {
-                const response = await axios.get("/user");
-                const user = response.data;
-                console.log(user);
+                const user = await this.session.fetchSession();
 
-                if (user.user.service_sigle !== "SNR") {
-                    let alert = await Swal.fire({
-                        title: "Accès refusé pour " + user.user.service_sigle,
-                        text: "Vous n'avez pas les droits nécessaires pour accéder à cette éspace.",
-                        icon: "error",
-                        timer: 3000,
-                        showConfirmButton: false,
-                        timerProgressBar: true,
-                    });
+                if (user.service_sigle !== "SNR") {
+                    await showAccessDenied(user.service_sigle);
                     window.location.href = "/other_service";
                 }
-            } catch (error) {
-                console.error("Error fetching connected user:", error);
-                const alert = await Swal.fire({
-                    title: "Erreur",
-                    text: "Veuillez vous connecter avant d'accéder à cette éspace.",
-                    icon: "error",
-                    timer: 3000,
-                    showConfirmButton: false,
-                    timerProgressBar: true,
-                });
+            } catch {
+                await showAuthenticationRequired();
                 window.location.href = "/login";
             }
         },
     },
 
     async mounted() {
-        Swal.fire({
-            title: "Veuilez patienter...",
-            text: "Chargement en cours",
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            didOpen: () => {
-                Swal.showLoading();
-            },
+        showLoading();
+        try {
+            await this.getConnectedUser();
+        } finally {
+            closeLoading();
+        }
+        this.clockInterval = startFrenchClock((dateTime) => {
+            this.dateTime = dateTime;
         });
-        await this.getConnectedUser();
-        await this.GetDays();
-        Swal.close();
-        setInterval(() => {
-            const now = new Date();
-            const options = {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-            };
-            this.dateTime = now.toLocaleDateString("fr-FR", options);
-        }, 1000);
+    },
+
+    beforeUnmount() {
+        window.clearInterval(this.clockInterval);
     },
 };
 </script>

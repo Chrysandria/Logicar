@@ -2,67 +2,74 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Mouvement;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 use App\Models\Car;
+use App\Models\Mouvement;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MouvementController extends Controller
 {
-    public function index()
+    public function monthly()
     {
         $monthly = DB::table('mouvements')
             ->join('cars', 'cars.matricule', '=', 'mouvements.mtrl_car')
-            ->select("cars.matricule", DB::raw('SUM(mouvements.distance_parcourue) as total'))
+            ->select('cars.matricule', DB::raw('SUM(mouvements.distance_parcourue) as total'))
             ->whereMonth('mouvements.date', '=', date('m'))
             ->whereYear('mouvements.date', '=', date('Y'))
             ->groupBy('cars.matricule')
             ->get();
 
-        return response()->json(['data' => $monthly,"month"=>Carbon::now()->locale("fr")->translatedFormat("F"),"year"=>Carbon::now()->year]);
+        return response()->json(['data' => $monthly, 'month' => Carbon::now()->locale('fr')->translatedFormat('F'), 'year' => Carbon::now()->year]);
     }
 
-    public function getDailyMoov()
+    public function index(Request $request)
     {
-        $cars = Car::all();
-        $daily = [];
+        $data = $request->validate([
+            'date' => 'sometimes|required|date',
+        ]);
 
-        foreach($cars as $car) {
-            $distance = DB::table('mouvements')
-                ->where('mtrl_car', $car->matricule)
-                ->whereDate('date', Carbon::now()->toDateString())
-                ->select('distance_parcourue')->get();
+        $date = $data['date'] ?? Carbon::today()->toDateString();
+        $distances = DB::table('mouvements')
+            ->whereDate('date', $date)
+            ->orderBy('id')
+            ->get(['mtrl_car', 'distance_parcourue'])
+            ->groupBy('mtrl_car')
+            ->map(fn ($movements) => $movements->first()->distance_parcourue);
 
-            $daily[] = [
-                'matricule' => $car->matricule,
-                'distance_parcourue' => $distance[0]->distance_parcourue ?? 0,
-                'km' => $distance[0]->distance_parcourue ?? 0
-            ];
-        }
+        $daily = Car::query()
+            ->orderBy('matricule')
+            ->get()
+            ->map(function (Car $car) use ($distances) {
+                $distance = $distances->get($car->matricule, 0);
+
+                return [
+                    'matricule' => $car->matricule,
+                    'distance_parcourue' => $distance,
+                    'km' => $distance,
+                ];
+            });
 
         return response()->json($daily);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'mtrl_car' => 'required|string',
-            'distance_parcourue' => 'required|numeric',
+        $data = $request->validate([
+            'mtrl_car' => 'required|string|exists:cars,matricule',
+            'distance_parcourue' => 'required|numeric|gt:0',
         ]);
 
-        if ($validated) {
-            Mouvement::updateOrCreate(
-                [
-                    'mtrl_car' => $request->mtrl_car,
-                    'date' => Carbon::now()->toDateString()
-                ],
-                [
-                    'distance_parcourue' => $request->distance_parcourue
-                ]
-            );
+        Mouvement::updateOrCreate(
+            [
+                'mtrl_car' => $data['mtrl_car'],
+                'date' => Carbon::today()->toDateString(),
+            ],
+            [
+                'distance_parcourue' => $data['distance_parcourue'],
+            ]
+        );
 
-            return response()->json(['message' => 'Mouvement enregistré !!'], 201);
-        }
+        return response()->json(['message' => 'Mouvement enregistré !!'], 201);
     }
 }

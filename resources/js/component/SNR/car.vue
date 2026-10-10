@@ -331,9 +331,13 @@
 <script>
 import Swal from "sweetalert2";
 import BarChart from "./chart.vue";
-import * as bootstrap from "bootstrap";
 import axios from "axios";
-import { ref } from "vue";
+import {
+    formatFrenchDate,
+    initTooltips,
+    showRequestError,
+} from "../../utils/interface.js";
+import { debugLog } from "../../utils/logger.js";
 export default {
     components: {
         BarChart,
@@ -343,7 +347,7 @@ export default {
         return {
             cars: [],
             daily_moov: [],
-            i: ref(0),
+            i: 0,
             current_anomalies: [],
             filter: "",
             resetdisplay: "display: none",
@@ -353,29 +357,19 @@ export default {
     methods: {
         async fetchCars() {
             try {
-                const response = await axios.get("/allCars");
+                const response = await axios.get("/cars");
                 this.cars = response.data;
-                console.log(this.cars);
+                debugLog("fleet", "Cars chargés.", { count: this.cars.length });
             } catch (error) {
-                console.error(
-                    "Erreur lors de la récupération des cars:",
-                    error,
-                );
+                debugLog("fleet", "Échec du chargement des cars.", {
+                    status: error.response?.status ?? "network",
+                });
+                this.showError(error, "Impossible de charger la liste des cars.");
             }
         },
 
         dateFormatation(date) {
-            let initialDate = new Date(date);
-            const options = {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-            };
-            let Formateddate = new Intl.DateTimeFormat("fr-FR", options).format(
-                initialDate,
-            );
-
-            return Formateddate;
+            return formatFrenchDate(date);
         },
 
         reloadChart() {
@@ -408,21 +402,26 @@ export default {
                     },
                 });
 
-                await axios.put(
-                    "/updateCar",
-                    {
-                        matricule: mtrl,
-                        description: typeAnom.value,
-                    }
-                );
+                if (!typeAnom.isConfirmed) {
+                    return;
+                }
+
+                await axios.post(`/cars/${encodeURIComponent(mtrl)}/anomalies`, {
+                    description: typeAnom.value,
+                });
+                debugLog("fleet", "Anomalie créée.", { car: mtrl });
                 Swal.fire({
                     title: "Confirmation",
                     text: `Nouvelle anomalie créer !!
                     Car ${mtrl} mis hors service.`,
                 });
-                this.fetchCars(); // Refresh the car list
+                await this.fetchCars();
             } catch (error) {
-                console.error("Erreur lors de la mise à jour du car:", error);
+                Swal.fire({
+                    icon: "error",
+                    title: "Erreur",
+                    text: error.response?.data?.message || "Impossible d'enregistrer l'anomalie.",
+                });
             }
         },
 
@@ -432,12 +431,8 @@ export default {
 
         async saveNewCar(mtrl) {
             try {
-                let response = await axios.post(
-                    "/newCar",
-                    {
-                        matricule: mtrl,
-                    }
-                );
+                let response = await axios.post("/cars", { matricule: mtrl });
+                debugLog("fleet", "Car créé.", { car: mtrl });
 
                 Swal.fire({
                     icon: "success",
@@ -451,68 +446,48 @@ export default {
                     icon: "error",
                     title: "Erreur",
                     text:
-                        err.response.data.message ||
-                        "Une erreur est survenue lors de l'enregistrement du planning.",
+                        err.response?.data?.message ||
+                        "Une erreur est survenue lors de l'enregistrement du car.",
                 });
-                console.log(err.response.data);
             }
-        },
-
-        initTooltips() {
-            document
-                .querySelectorAll("[data-bs-toggle='tooltip']")
-                .forEach((el) => {
-                    const instance = bootstrap.Tooltip.getInstance(el);
-                    if (instance) instance.dispose();
-                });
-
-            document
-                .querySelectorAll("[data-bs-toggle='tooltip']")
-                .forEach((el) => {
-                    new bootstrap.Tooltip(el, {
-                        placement: "right",
-                    });
-                });
         },
 
         async deleteCar(matricule) {
             try {
 
-                Swal.fire({
+                const confirmation = await Swal.fire({
                     title: "Êtes-vous sûr ?",
                     text: `Voulez-vous vraiment supprimer le car ${matricule} ?`,
                     icon: "warning",
                     showCancelButton: true,
                     confirmButtonText: "Oui, supprimer",
                     cancelButtonText: "Annuler",
-                }).then(async (result) => {
-                    if (result.isConfirmed) {
-                        await axios.delete("/deleteCar", {
-                            data: { matricule },
-                        });
-                        Swal.fire(
-                            "Supprimé!",
-                            `Le car ${matricule} a été supprimé.`,
-                            "success",
-                        );
-                        this.fetchCars();
-                    }
                 });
+
+                if (!confirmation.isConfirmed) return;
+
+                await axios.delete(`/cars/${encodeURIComponent(matricule)}`);
+                debugLog("fleet", "Car supprimé.", { car: matricule });
+                await Swal.fire(
+                    "Supprimé!",
+                    `Le car ${matricule} a été supprimé.`,
+                    "success",
+                );
+                await this.fetchCars();
             } catch (error) {
-                console.error("Erreur lors de la suppression du car:", error);
+                this.showError(error, "Impossible de supprimer ce car.");
             }
         },
 
         async fetchDailyMoov() {
             try {
-                const response = await axios.get("/daily_moov");
+                const response = await axios.get("/movements");
                 this.daily_moov = response.data;
-                console.log(this.daily_moov);
+                debugLog("fleet", "Mouvements du jour chargés.", {
+                    count: this.daily_moov.length,
+                });
             } catch (error) {
-                console.error(
-                    "Erreur lors de la récupération des mouvements du jour:",
-                    error,
-                );
+                this.showError(error, "Impossible de charger les mouvements du jour.");
             }
         },
 
@@ -527,13 +502,11 @@ export default {
                     return;
                 }
 
-                await axios.post(
-                    "/store_moov",
-                    {
-                        mtrl_car: mtrl,
-                        distance_parcourue: distance,
-                    }
-                );
+                await axios.post("/movements", {
+                    mtrl_car: mtrl,
+                    distance_parcourue: distance,
+                });
+                debugLog("fleet", "Mouvement enregistré.", { car: mtrl });
 
                 if (km === 0) {
                     await Swal.fire({
@@ -549,13 +522,9 @@ export default {
                     });
                 }
 
-                this.fetchDailyMoov();
-                BarChart.methods.fetchData();
+                await this.fetchDailyMoov();
             } catch (error) {
-                console.error(
-                    "Erreur lors de l'enregistrement du mouvement:",
-                    error,
-                );
+                this.showError(error, "Impossible d'enregistrer ce mouvement.");
             } finally {
                 this.reloadChart();
             }
@@ -563,26 +532,20 @@ export default {
 
         async fetchCurrentAnomalies() {
             try {
-                const response = await axios.get("/current_anomalies");
+                const response = await axios.get("/anomalies");
                 this.current_anomalies = response.data;
-                console.log(this.current_anomalies);
+                debugLog("fleet", "Anomalies chargées.", {
+                    count: this.current_anomalies.length,
+                });
             } catch (error) {
-                console.error(
-                    "Erreur lors de la récupération des anomalies en cours:",
-                    error,
-                );
+                this.showError(error, "Impossible de charger les anomalies.");
             }
         },
 
         async EndAnomaly(id, mtrl_car) {
             try {
-                const response = await axios.put(
-                    "/end_anomalie",
-                    {
-                        id_anom: id,
-                        matricule: mtrl_car,
-                    }
-                );
+                const response = await axios.patch(`/anomalies/${id}`);
+                debugLog("fleet", "Anomalie clôturée.", { anomalyId: id, car: mtrl_car });
 
                 Swal.fire({
                     icon: "success",
@@ -590,19 +553,16 @@ export default {
                     text: response.data.message,
                 });
 
-                this.fetchCurrentAnomalies();
-                this.fetchCars();
+                await this.fetchCurrentAnomalies();
+                await this.fetchCars();
             } catch (error) {
-                console.error(
-                    "Erreur lors de la clôture de l'anomalie:",
-                    error,
-                );
+                this.showError(error, "Impossible de clôturer cette anomalie.");
             }
         },
 
         async findAnom() {
             try {
-                let response = await axios.get("/findAnom", {
+                let response = await axios.get("/anomalies", {
                     params: {
                         matricule: this.filter,
                     },
@@ -611,9 +571,12 @@ export default {
                 this.current_anomalies = response.data;
                 this.resetdisplay =
                     "display: flex, justify-content: flex-end !important";
-                console.log(this.current_anomalies);
             } catch (err) {
-                console.log(err);
+                Swal.fire({
+                    icon: "error",
+                    title: "Erreur",
+                    text: err.response?.data?.message || "Impossible de rechercher les anomalies.",
+                });
             }
         },
 
@@ -622,19 +585,26 @@ export default {
             this.resetdisplay = "display: none";
             this.fetchCurrentAnomalies();
         },
+
+        showError(error, fallback) {
+            return showRequestError(error, fallback);
+        },
+
     },
 
     async mounted() {
-        await this.fetchCars();
-        await this.fetchDailyMoov();
-        await this.fetchCurrentAnomalies();
-        this.initTooltips();
+        await Promise.all([
+            this.fetchCars(),
+            this.fetchDailyMoov(),
+            this.fetchCurrentAnomalies(),
+        ]);
+        await initTooltips();
     },
 
     watch: {
         cars: {
-            handler(newCars) {
-                this.initTooltips();
+            async handler() {
+                await initTooltips();
             },
             deep: true,
         },
