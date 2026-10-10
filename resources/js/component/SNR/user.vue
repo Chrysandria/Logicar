@@ -1,24 +1,35 @@
 <template>
     <div class="container-fluid">
-        <div class="d-flex justify-content-between mb-4">
-            <div>
-                <h4 class="text-decoration-underline">Gestion des utilisateurs</h4>
+        <div class="page-heading">
+            <div class="page-heading__title">
+                <span class="page-heading__icon" aria-hidden="true">
+                    <i class="bi bi-people"></i>
+                </span>
+                <div>
+                    <h2>Gestion des utilisateurs</h2>
+                    <p>Consultez et gérez les accès aux différents services.</p>
+                </div>
             </div>
-            <div class="d-flex justify-content-end">
-                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newUser">Nouvel
-                    utilisateur</button>
+            <div class="page-heading__actions">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newUser">
+                    <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
+                    Nouvel utilisateur
+                </button>
             </div>
         </div>
+        <div class="user-search input-group">
+            <span class="input-group-text" aria-hidden="true">
+                <i class="bi bi-search"></i>
+            </span>
+            <input
+                type="search"
+                class="form-control"
+                placeholder="Rechercher par nom d'utilisateur ou service"
+                aria-label="Rechercher un utilisateur par nom ou service"
+                v-model="searchTerm"
+            >
+        </div>
         <div class="table-responsive">
-            <div class="mb-4">
-                <input
-                    type="search"
-                    class="form-control"
-                    placeholder="Rechercher par nom d'utilisateur ou service"
-                    aria-label="Rechercher un utilisateur par nom ou service"
-                    v-model="searchTerm"
-                >
-            </div>
             <table class="table table-striped table-bordered text-center align-middle">
                 <thead class="table-dark">
                     <tr>
@@ -43,7 +54,7 @@
             </table>
         </div>
     </div>
-    <div class="fade modal" tabindex="-1" id="newUser" aria-hidden="true" aria-labelledby="#modalTitle">
+    <div class="fade modal" tabindex="-1" id="newUser" aria-hidden="true" aria-labelledby="modalTitle">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-dark">

@@ -1,34 +1,40 @@
 <template>
     <div class="container-fluid">
-        <div class="row mb-4">
-            <div class="col">
-                <h2>Gestion des Cars</h2>
-                <p>Cette section permet de gérer les informations des cars.</p>
-            </div>
-            <div class="col align-self-center text-end">
-                <div class="d-flex flex-wrap justify-content-end gap-2">
-                    <button
-                        class="btn btn-primary"
-                        data-bs-toggle="modal"
-                        data-bs-target="#dmModal"
-                    >
-                        Mouvement du jour
-                    </button>
-                    <button
-                        class="btn btn-primary"
-                        data-bs-toggle="modal"
-                        data-bs-target="#carModal"
-                    >
-                        Liste des cars
-                    </button>
-                    <button
-                        class="btn btn-primary"
-                        data-bs-toggle="modal"
-                        data-bs-target="#anomaliesModal"
-                    >
-                        Liste des anomalies
-                    </button>
+        <div class="page-heading">
+            <div class="page-heading__title">
+                <span class="page-heading__icon" aria-hidden="true">
+                    <i class="bi bi-truck-front"></i>
+                </span>
+                <div>
+                    <h2>Gestion des cars</h2>
+                    <p>Suivez la flotte, les mouvements et les anomalies.</p>
                 </div>
+            </div>
+            <div class="page-heading__actions">
+                <button
+                    class="btn btn-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#dmModal"
+                >
+                    <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>
+                    Mouvement du jour
+                </button>
+                <button
+                    class="btn btn-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#carModal"
+                >
+                    <i class="bi bi-list-ul me-1" aria-hidden="true"></i>
+                    Liste des cars
+                </button>
+                <button
+                    class="btn btn-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#anomaliesModal"
+                >
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                    Liste des anomalies
+                </button>
             </div>
         </div>
         <BarChart :key="i" />

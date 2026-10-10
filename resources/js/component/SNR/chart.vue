@@ -1,18 +1,29 @@
 <template>
-    <div class="row">
-        <div class="chart-container col-12 col-lg-6">
-            <BarChartJS :data="chartData" :chart-options="chartOptions" />
+    <div class="row g-4">
+        <div class="chart-panel col-12 col-xl-6">
+            <div class="chart-container">
+                <BarChartJS :data="chartData" :chart-options="chartOptions" />
+            </div>
         </div>
-        <div class="table-responsive col-12 col-lg-6 p-5 chart-container">
-            <table class="table table-striped table-bordered">
-                <thead class="table-dark text-white"><tr><th>Matricule</th><th>Kilomètres parcourus</th></tr></thead>
-                <tbody>
-                    <tr v-for="(item, index) in chartData.datasets[0].data" :key="chartData.labels[index]">
-                        <td>{{ chartData.labels[index] }}</td>
-                        <td>{{ item }}</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="chart-panel col-12 col-xl-6">
+            <div class="chart-container">
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Kilomètres parcourus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(item, index) in chartData.datasets[0].data" :key="chartData.labels[index]">
+                                <td>{{ chartData.labels[index] }}</td>
+                                <td>{{ item }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -53,7 +64,7 @@ export default defineComponent({
                 datasets: [
                     {
                         label: 'Kilomètres parcourus',
-                        backgroundColor: 'rgba(0,0,255,0.5)',
+                        backgroundColor: 'rgba(21,94,239,0.65)',
                         data: [],
                     },
                 ],
@@ -86,7 +97,7 @@ export default defineComponent({
                     datasets: [
                         {
                             label: `Mouvement des car pour le mois de ${response.data.month} ${response.data.year} (en km)`,
-                            backgroundColor: 'rgba(0,0,255,0.5)',
+                            backgroundColor: 'rgba(21,94,239,0.65)',
                             data: data.map(item => item.total),
                         },
                     ],
