@@ -12,7 +12,7 @@ use App\Http\Controllers\TrajetController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+Route::view('/', 'landing')->name('home');
 Route::view('/login', 'index')->name('login');
 Route::post('/login', [AuthController::class, 'store'])->name('session.store');
 

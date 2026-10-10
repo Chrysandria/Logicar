@@ -7,11 +7,16 @@ use Tests\TestCase;
 
 class RouteAccessTest extends TestCase
 {
-    public function test_the_homepage_redirects_to_login(): void
+    public function test_the_homepage_displays_the_landing_page_and_login_remains_available(): void
     {
-        $response = $this->get('/');
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Le transport du personnel,')
+            ->assertSee('organisé simplement.')
+            ->assertSee('href="' . route('login') . '"', false);
 
-        $response->assertRedirect('/login');
+        $this->get('/login')
+            ->assertOk();
     }
 
     public function test_application_workspaces_and_data_routes_require_authentication(): void
