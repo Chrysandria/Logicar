@@ -69,28 +69,24 @@
                     <button type="button" @click="sub = []" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-4 d-flex gap-1 flex-column" id="form">
-                        <div class="d-flex justify-content-between">
-                            <div class="input-group w-25">
-                                <span class="input-group-text bg-light"><label for="hps"
-                                        class="form-label fw-semibold">Heure de début de ramassage: </label></span>
-                                <input type="time" name="hps" id="hps" v-model="hdr" class="form-control">
-                            </div>
-                            <div class="d-flex justify-content-end">
-                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recap">
-                                    Recapitulation
-                                </button>
-                            </div>
+                    <div class="planning-treatment-controls mb-4" id="form">
+                        <div class="planning-treatment-field">
+                            <label for="hps" class="form-label">Heure de début de ramassage</label>
+                            <input type="time" name="hps" id="hps" v-model="hdr" class="form-control">
                         </div>
-                        <div class="input-group w-25 mt-4">
-                            <span class="input-group-text bg-light"><label for="hps"
-                                    class="form-label fw-semibold">Trajet:</label></span>
+                        <div class="planning-treatment-field">
+                            <label for="trajet" class="form-label">Trajet</label>
                             <select name="trajet" id="trajet" class="form-select" v-model="id_trajet">
                                 <option value="" class="disabled-value">Choisir un trajet</option>
                                 <option v-for="(trajet, i) in trajets" :key="i" :value="trajet.id"> {{ trajet.designation
                                     }} </option>
                             </select>
                         </div>
+                        <button class="btn btn-primary planning-treatment-recap" data-bs-toggle="modal"
+                            data-bs-target="#recap">
+                            <i class="bi bi-list-check me-1" aria-hidden="true"></i>
+                            Récapitulation
+                        </button>
                     </div>
 
                     <div class="table-responsive">
@@ -142,7 +138,7 @@
     <div class="fade modal" tabindex="-1" id="recap" aria-hidden="true" aria-labelledby="#recapTitle">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
-                <div class="modal-header bg-light mb-4">
+                <div class="modal-header bg-light">
                     <h5 class="modal-title" id="recapTitle">Planning du {{ date }} à {{ hps }}</h5>
                     <button type="button" class="btn-close" data-bs-toggle="modal"
                         data-bs-target="#traitementModal"></button>

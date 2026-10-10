@@ -62,14 +62,18 @@ class PdfController extends Controller
         $pdf->Line(12, 36, 285, 36);
         $pdf->Ln(7);
 
-        foreach ($data['data'] as $item) {
+        foreach ($data['data'] as $itemIndex => $item) {
+            if ($itemIndex > 0) {
+                $pdf->Ln(4);
+            }
+
             foreach ($item['ramassage'] as $ramassage) {
                 $pdf->SetFillColor(239, 244, 255);
                 $pdf->SetDrawColor(208, 221, 255);
                 $pdf->SetTextColor(21, 54, 111);
                 $pdf->SetFont('helvetica', 'B', 11);
                 $pdf->Cell(
-                    261,
+                    273,
                     10,
                     '  Trajet : '.self::escape($ramassage['trajet'])
                         .'     |     Début du ramassage : '.self::escape(self::formatTime($ramassage['HDR'])),
@@ -86,11 +90,11 @@ class PdfController extends Controller
                     <thead>
                         <tr style="background-color:#155eef;color:#ffffff;font-weight:bold;">
                             <th width="8%" align="center">Matricule</th>
-                            <th width="20%">Nom et prénom</th>
+                            <th width="20%" align="left">Nom et prénom</th>
                             <th width="13%" align="center">Téléphone</th>
-                            <th width="17%">Lieu de ramassage</th>
-                            <th width="21%">Point ADM</th>
-                            <th width="21%">Point décalé</th>
+                            <th width="17%" align="left">Lieu de ramassage</th>
+                            <th width="21%" align="left">Point ADM</th>
+                            <th width="21%" align="left">Point décalé</th>
                         </tr>
                     </thead>
                     <tbody>';
@@ -98,24 +102,24 @@ class PdfController extends Controller
             foreach ($item['emps'] as $index => $employee) {
                 $background = $index % 2 === 0 ? '#ffffff' : '#f5f8ff';
                 $table .= '<tr style="background-color:'.$background.';">
-                    <td align="center">'.self::escape($employee['matricule']).'</td>
-                    <td>'.self::escape($employee['nom']).'</td>
-                    <td align="center">'.self::escape($employee['telephone'] ?? '').'</td>
-                    <td>'.self::escape($employee['lieu_ramassage'] ?? '').'</td>
-                    <td>'.self::escape($employee['pnt_ramassage_adm'] ?? '').'</td>
-                    <td>'.self::escape($employee['pnt_ramassage_dec'] ?? '').'</td>
+                    <td width="8%" align="center">'.self::escape($employee['matricule']).'</td>
+                    <td width="20%" align="left">'.self::escape($employee['nom']).'</td>
+                    <td width="13%" align="center">'.self::escape($employee['telephone'] ?? '').'</td>
+                    <td width="17%" align="left">'.self::escape($employee['lieu_ramassage'] ?? '').'</td>
+                    <td width="21%" align="left">'.self::escape($employee['pnt_ramassage_adm'] ?? '').'</td>
+                    <td width="21%" align="left">'.self::escape($employee['pnt_ramassage_dec'] ?? '').'</td>
                 </tr>';
             }
 
-            $table .= '</tbody></table><br />';
+            $table .= '</tbody></table>';
 
             $pdf->SetTextColor(16, 24, 40);
             $pdf->SetFont('helvetica', '', 9);
             $pdf->writeHTML($table, true, false, true, false, '');
-            $pdf->Ln(3);
         }
 
         $pageCount = $pdf->getNumPages();
+        $pdf->SetAutoPageBreak(false);
         for ($page = 1; $page <= $pageCount; $page++) {
             $pdf->setPage($page);
             $pdf->SetY(-12);

@@ -44,5 +44,10 @@ class PlanningPdfTest extends TestCase
 
         $this->assertStringStartsWith('%PDF-', $response->getContent());
         $this->assertStringContainsString('/Subtype /Image', $response->getContent());
+        $this->assertSame(
+            1,
+            preg_match_all('/\/Type\s*\/Page\b/', $response->getContent()),
+            'A single-group planning PDF should contain exactly one page.',
+        );
     }
 }

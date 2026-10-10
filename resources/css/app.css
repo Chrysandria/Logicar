@@ -439,6 +439,30 @@ main {
     padding: 1.25rem;
 }
 
+.planning-treatment-controls {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.75fr) minmax(260px, 1fr) auto;
+    align-items: end;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--app-line);
+    border-radius: 0.8rem;
+    background: #f9fafb;
+}
+
+.planning-treatment-field {
+    min-width: 0;
+}
+
+.planning-treatment-field .form-label {
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.planning-treatment-recap {
+    white-space: nowrap;
+}
+
 .planning-entry-error {
     width: fit-content;
     max-width: 100%;
@@ -702,6 +726,21 @@ a:hover {
     .workspace-header .navbar-collapse .d-flex + .d-flex {
         margin-top: 0.5rem;
     }
+
+    #traitementModal .modal-body,
+    #recap .modal-body {
+        padding: 1rem;
+    }
+
+    .planning-treatment-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    .planning-treatment-recap {
+        grid-column: 1 / -1;
+        justify-self: end;
+    }
 }
 
 @media (min-width: 992px) {
@@ -767,6 +806,47 @@ a:hover {
 
     .planning-toolbar__date {
         font-size: 1rem;
+    }
+
+    #traitementModal .modal-header,
+    #recap .modal-header {
+        padding: 0.8rem 0.9rem;
+    }
+
+    #traitementModal .modal-title,
+    #recap .modal-title {
+        max-width: calc(100% - 2.5rem);
+        font-size: 1rem;
+        line-height: 1.35;
+    }
+
+    #traitementModal .modal-body,
+    #recap .modal-body {
+        padding: 0.75rem;
+    }
+
+    .planning-treatment-controls {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.7rem;
+        padding: 0.8rem;
+    }
+
+    .planning-treatment-recap {
+        width: 100%;
+    }
+
+    #recap .card-header {
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+    }
+
+    #recap .card-header > div {
+        justify-content: flex-start !important;
+    }
+
+    #traitementModal .modal-footer,
+    #recap .modal-footer {
+        padding: 0.75rem;
     }
 
     .btn {
